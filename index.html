@@ -262,7 +262,7 @@ function tablo(stores){
     </tr>`;
 
     stores.forEach(s=>{
-        let c="out", t="Yok";
+        let c="out", t="Sınırlı";
         if(s.stockLevel==="sufficient"){c="sufficient";t="Yeterli"}
         else if(s.stockLevel==="limited"){c="limited";t="Sınırlı"}
 
