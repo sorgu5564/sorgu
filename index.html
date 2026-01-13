@@ -21,20 +21,92 @@ th { background:#eee }
 <body>
 
 <div class="box">
-<h2>A101 En Yakın Mağaza Stok Sorgu</h2>
+<h2>A101 Stok Sorgu</h2>
 
 <label>Ürün (Item ID)</label>
 <input id="itemId" value="30000905">
 
-<button id="btn" onclick="sorgula()">Sorgula</button>
+<button id="btn" onclick="baslat()">Sorgula</button>
 
 <div id="info" class="info"></div>
 <div id="tablo"></div>
 </div>
 
 <script>
-const GEOHASH = "sxkc1x5gj";
+const HEDEF_GEOHASH = "sxkc1x5gj";
+const MAKS_MESAFE = 20; // metre
 let kilitli = false;
+
+/* ---------------- GEOHASH DECODE ---------------- */
+const base32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+
+function decodeGeohash(geohash) {
+    let even = true;
+    let lat = [-90, 90];
+    let lon = [-180, 180];
+
+    for (let c of geohash) {
+        let bits = base32.indexOf(c);
+        for (let i = 4; i >= 0; i--) {
+            let mid;
+            if (even) {
+                mid = (lon[0] + lon[1]) / 2;
+                (bits >> i) & 1 ? lon[0] = mid : lon[1] = mid;
+            } else {
+                mid = (lat[0] + lat[1]) / 2;
+                (bits >> i) & 1 ? lat[0] = mid : lat[1] = mid;
+            }
+            even = !even;
+        }
+    }
+    return {
+        lat: (lat[0] + lat[1]) / 2,
+        lng: (lon[0] + lon[1]) / 2
+    };
+}
+
+/* ---------------- MESAFE HESABI ---------------- */
+function mesafeMetre(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/* ---------------- ANA AKIŞ ---------------- */
+function baslat() {
+    if (!navigator.geolocation) {
+        alert("Konum desteklenmiyor");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(pos => {
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+
+        const hedef = decodeGeohash(HEDEF_GEOHASH);
+        const mesafe = mesafeMetre(
+            userLat, userLng,
+            hedef.lat, hedef.lng
+        );
+
+        if (mesafe > MAKS_MESAFE) {
+            document.getElementById("info").textContent =
+                `❌ Yetkisiz konum! Mesafe: ${mesafe.toFixed(1)} m`;
+            return;
+        }
+
+        sorgula(); // ✅ sistem aktif
+
+    }, () => {
+        alert("Konum izni verilmedi");
+    });
+}
 
 /* ---------------- SORGU ---------------- */
 async function sorgula() {
@@ -43,9 +115,8 @@ async function sorgula() {
 
     const btn = document.getElementById("btn");
     const info = document.getElementById("info");
-    const tabloDiv = document.getElementById("tablo");
-
     btn.disabled = true;
+
     let kalan = 20;
     btn.textContent = `Bekleyin (${kalan})`;
 
@@ -61,11 +132,10 @@ async function sorgula() {
     }, 1000);
 
     info.textContent = "Sorgulanıyor...";
-    tabloDiv.innerHTML = "";
 
     const payload = {
-        geoHash: GEOHASH,
-        itemId: document.getElementById("itemId").value.trim()
+        geoHash: HEDEF_GEOHASH,
+        itemId: document.getElementById("itemId").value
     };
 
     const url =
@@ -75,74 +145,41 @@ async function sorgula() {
         "&__isbase64=true";
 
     try {
-        const response = await fetch(url);
-        const json = await response.json();
+        const r = await fetch(url);
+        const j = await r.json();
 
-        // Mesafeye göre sırala
-        const stores = (json.stores || []).sort(
-            (a, b) => a.distance - b.distance
-        );
+        const stores = (j.stores || []).sort((a,b)=>a.distance-b.distance);
+        tablo(stores);
+        info.textContent = `Toplam ${stores.length} mağaza`;
 
-        info.textContent = `Toplam ${stores.length} mağaza bulundu`;
-        tabloOlustur(stores);
-
-    } catch (e) {
-        info.textContent = "❌ Sorgu sırasında hata oluştu";
+    } catch {
+        info.textContent = "Hata oluştu";
     }
 }
 
 /* ---------------- TABLO ---------------- */
-function tabloOlustur(stores) {
-    if (!stores.length) {
-        document.getElementById("tablo").textContent = "Mağaza bulunamadı";
-        return;
-    }
+function tablo(stores) {
+    if (!stores.length) return;
 
-    let html = `
-    <table>
-        <thead>
-            <tr>
-                <th>Mesafe (m)</th>
-                <th>Kod</th>
-                <th>Mağaza</th>
-                <th>İl</th>
-                <th>İlçe</th>
-                <th>Adres</th>
-                <th>Stok</th>
-            </tr>
-        </thead>
-        <tbody>
-    `;
+    let h = `<table><tr>
+        <th>Mesafe</th><th>Mağaza</th><th>Adres</th><th>Stok</th>
+    </tr>`;
 
-    stores.forEach(s => {
-        let cls = "out";
-        let txt = s.stockLevel;
+    stores.forEach(s=>{
+        let c="out", t=s.stockLevel;
+        if(t==="sufficient"){c="sufficient";t="Yeterli"}
+        else if(t==="limited"){c="limited";t="Sınırlı"}
 
-        if (s.stockLevel === "sufficient") {
-            cls = "sufficient";
-            txt = "Yeterli";
-        } else if (s.stockLevel === "limited") {
-            cls = "limited";
-            txt = "Sınırlı";
-        }
-
-        html += `
-        <tr>
-            <td>${s.distance}</td>
-            <td>${s.id}</td>
+        h+=`<tr>
+            <td>${s.distance} m</td>
             <td>${s.name}</td>
-            <td>${s.city}</td>
-            <td>${s.townShip}</td>
             <td>${s.address}</td>
-            <td class="${cls}">${txt}</td>
-        </tr>
-        `;
+            <td class="${c}">${t}</td>
+        </tr>`;
     });
 
-    html += "</tbody></table>";
-    document.getElementById("tablo").innerHTML = html;
+    document.getElementById("tablo").innerHTML = h + "</table>";
 }
 </script>
-
 </body>
 </html>
