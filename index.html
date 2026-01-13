@@ -4,181 +4,277 @@
 <meta charset="UTF-8">
 <title>A101 Stok Sorgulama</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <style>
-body { font-family: Arial; background:#f2f2f2; padding:20px }
-.box { max-width:900px; margin:auto; background:#fff; padding:20px; border-radius:8px }
-input, button { width:100%; padding:10px; margin-top:10px; font-size:16px }
-button:disabled { background:#ccc }
-table { width:100%; border-collapse:collapse; margin-top:20px }
-th, td { border:1px solid #ccc; padding:8px }
-th { background:#eee }
-.sufficient { color:green; font-weight:bold }
-.limited { color:orange; font-weight:bold }
-.out { color:red; font-weight:bold }
-.info { margin-top:10px; font-style:italic }
+:root{
+    --primary:#2563eb;
+    --bg:#f4f6fb;
+    --card:#ffffff;
+    --text:#1f2937;
+    --muted:#6b7280;
+    --success:#16a34a;
+    --warning:#f59e0b;
+    --danger:#dc2626;
+}
+
+*{ box-sizing:border-box }
+
+body{
+    font-family:'Inter',sans-serif;
+    background:var(--bg);
+    padding:20px;
+    color:var(--text);
+}
+
+.box{
+    max-width:1000px;
+    margin:auto;
+    background:var(--card);
+    padding:24px;
+    border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+
+h2{
+    margin:0 0 20px;
+    font-size:24px;
+    font-weight:700;
+    background:linear-gradient(90deg,var(--primary),#4f46e5);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+}
+
+label{
+    font-weight:500;
+    font-size:14px;
+}
+
+input{
+    width:100%;
+    padding:12px;
+    margin-top:8px;
+    font-size:15px;
+    border-radius:10px;
+    border:1px solid #e5e7eb;
+    outline:none;
+}
+
+input:focus{
+    border-color:var(--primary);
+}
+
+button{
+    width:100%;
+    padding:14px;
+    margin-top:14px;
+    font-size:16px;
+    font-weight:600;
+    color:#fff;
+    background:var(--primary);
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+    transition:.2s;
+}
+
+button:hover{ opacity:.9 }
+button:disabled{
+    background:#c7c7c7;
+    cursor:not-allowed;
+}
+
+.info{
+    margin-top:14px;
+    font-size:14px;
+    color:var(--muted);
+}
+
+/* TABLO */
+.table-wrap{
+    overflow-x:auto;
+    margin-top:20px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:600px;
+}
+
+th,td{
+    padding:12px;
+    border-bottom:1px solid #e5e7eb;
+    font-size:14px;
+    text-align:left;
+}
+
+th{
+    background:#f8fafc;
+    font-weight:600;
+}
+
+tr:hover{
+    background:#f9fafb;
+}
+
+/* STOK ROZETLERİ */
+.badge{
+    padding:6px 12px;
+    border-radius:999px;
+    font-weight:600;
+    font-size:12px;
+    display:inline-block;
+}
+
+.sufficient{ background:#dcfce7; color:var(--success) }
+.limited{ background:#fef3c7; color:var(--warning) }
+.out{ background:#fee2e2; color:var(--danger) }
+
+@media(max-width:600px){
+    h2{ font-size:20px }
+}
 </style>
 </head>
+
 <body>
 
 <div class="box">
-<h2>A101 Stok Sorgu</h2>
+    <h2>A101 Stok Sorgu</h2>
 
-<label>Ürün (Item ID)</label>
-<input id="itemId" value="30000905">
+    <label>Ürün (Item ID)</label>
+    <input id="itemId" value="30000905">
 
-<button id="btn" onclick="baslat()">Sorgula</button>
+    <button id="btn" onclick="baslat()">Sorgula</button>
 
-<div id="info" class="info"></div>
-<div id="tablo"></div>
+    <div id="info" class="info"></div>
+    <div id="tablo" class="table-wrap"></div>
 </div>
 
 <script>
 const HEDEF_GEOHASH = "sxkc1x5gj";
-const MAKS_MESAFE = 200; // metre
+const MAKS_MESAFE = 200;
 let kilitli = false;
 
-/* ---------------- GEOHASH DECODE ---------------- */
 const base32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
-function decodeGeohash(geohash) {
-    let even = true;
-    let lat = [-90, 90];
-    let lon = [-180, 180];
-
-    for (let c of geohash) {
-        let bits = base32.indexOf(c);
-        for (let i = 4; i >= 0; i--) {
+function decodeGeohash(geohash){
+    let even=true, lat=[-90,90], lon=[-180,180];
+    for(let c of geohash){
+        let bits=base32.indexOf(c);
+        for(let i=4;i>=0;i--){
             let mid;
-            if (even) {
-                mid = (lon[0] + lon[1]) / 2;
-                (bits >> i) & 1 ? lon[0] = mid : lon[1] = mid;
-            } else {
-                mid = (lat[0] + lat[1]) / 2;
-                (bits >> i) & 1 ? lat[0] = mid : lat[1] = mid;
+            if(even){
+                mid=(lon[0]+lon[1])/2;
+                (bits>>i)&1 ? lon[0]=mid : lon[1]=mid;
+            }else{
+                mid=(lat[0]+lat[1])/2;
+                (bits>>i)&1 ? lat[0]=mid : lat[1]=mid;
             }
-            even = !even;
+            even=!even;
         }
     }
-    return {
-        lat: (lat[0] + lat[1]) / 2,
-        lng: (lon[0] + lon[1]) / 2
-    };
+    return { lat:(lat[0]+lat[1])/2, lng:(lon[0]+lon[1])/2 };
 }
 
-/* ---------------- MESAFE HESABI ---------------- */
-function mesafeMetre(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+function mesafeMetre(lat1,lon1,lat2,lon2){
+    const R=6371000;
+    const dLat=(lat2-lat1)*Math.PI/180;
+    const dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2 +
+        Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+        Math.sin(dLon/2)**2;
+    return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-/* ---------------- ANA AKIŞ ---------------- */
-function baslat() {
-    if (!navigator.geolocation) {
-        alert("Konum desteklenmiyor");
-        return;
+function baslat(){
+    if(!navigator.geolocation){
+        alert("Konum desteklenmiyor"); return;
     }
 
-    navigator.geolocation.getCurrentPosition(pos => {
-        const userLat = pos.coords.latitude;
-        const userLng = pos.coords.longitude;
-
-        const hedef = decodeGeohash(HEDEF_GEOHASH);
-        const mesafe = mesafeMetre(
-            userLat, userLng,
+    navigator.geolocation.getCurrentPosition(pos=>{
+        const hedef=decodeGeohash(HEDEF_GEOHASH);
+        const mesafe=mesafeMetre(
+            pos.coords.latitude,
+            pos.coords.longitude,
             hedef.lat, hedef.lng
         );
 
-        if (mesafe > MAKS_MESAFE) {
+        if(mesafe>MAKS_MESAFE){
             document.getElementById("info").textContent =
                 `❌ Yetkisiz konum! Mesafe: ${mesafe.toFixed(1)} m`;
             return;
         }
-
-        sorgula(); // ✅ sistem aktif
-
-    }, () => {
-        alert("Konum izni verilmedi");
-    });
+        sorgula();
+    },()=>alert("Konum izni verilmedi"));
 }
 
-/* ---------------- SORGU ---------------- */
-async function sorgula() {
-    if (kilitli) return;
-    kilitli = true;
+async function sorgula(){
+    if(kilitli) return;
+    kilitli=true;
 
-    const btn = document.getElementById("btn");
-    const info = document.getElementById("info");
-    btn.disabled = true;
+    const btn=document.getElementById("btn");
+    const info=document.getElementById("info");
+    btn.disabled=true;
 
-    let kalan = 20;
-    btn.textContent = `Bekleyin (${kalan})`;
+    let kalan=30;
+    btn.textContent=`Bekleyin (${kalan})`;
 
-    const sayac = setInterval(() => {
+    const sayac=setInterval(()=>{
         kalan--;
-        btn.textContent = `Bekleyin (${kalan})`;
-        if (kalan <= 0) {
+        btn.textContent=`Bekleyin (${kalan})`;
+        if(kalan<=0){
             clearInterval(sayac);
-            kilitli = false;
-            btn.disabled = false;
-            btn.textContent = "Sorgula";
+            kilitli=false;
+            btn.disabled=false;
+            btn.textContent="Sorgula";
         }
-    }, 1000);
+    },1000);
 
-    info.textContent = "Sorgulanıyor...";
+    info.textContent="Sorgulanıyor...";
 
-    const payload = {
-        geoHash: HEDEF_GEOHASH,
-        itemId: document.getElementById("itemId").value
+    const payload={
+        geoHash:HEDEF_GEOHASH,
+        itemId:document.getElementById("itemId").value
     };
 
-    const url =
-        "https://rio.a101.com.tr/dbmk89vnr/CALL/StoreContentManager/nearestStores/default" +
-        "?__culture=tr-TR&__platform=web&data=" +
-        btoa(JSON.stringify(payload)) +
+    const url="https://rio.a101.com.tr/dbmk89vnr/CALL/StoreContentManager/nearestStores/default"+
+        "?__culture=tr-TR&__platform=web&data="+
+        btoa(JSON.stringify(payload))+
         "&__isbase64=true";
 
-    try {
-        const r = await fetch(url);
-        const j = await r.json();
-
-        const stores = (j.stores || []).sort((a,b)=>a.distance-b.distance);
-        tablo(stores);
-        info.textContent = `Toplam ${stores.length} mağaza`;
-
-    } catch {
-        info.textContent = "Hata oluştu";
+    try{
+        const r=await fetch(url);
+        const j=await r.json();
+        tablo((j.stores||[]).sort((a,b)=>a.distance-b.distance));
+        info.textContent=`Toplam ${j.stores.length} mağaza`;
+    }catch{
+        info.textContent="Hata oluştu";
     }
 }
 
-/* ---------------- TABLO ---------------- */
-function tablo(stores) {
-    if (!stores.length) return;
+function tablo(stores){
+    if(!stores.length) return;
 
-    let h = `<table><tr>
+    let h=`<table><tr>
         <th>Mesafe</th><th>Mağaza</th><th>Adres</th><th>Stok</th>
     </tr>`;
 
     stores.forEach(s=>{
-        let c="out", t=s.stockLevel;
-        if(t==="sufficient"){c="sufficient";t="Yeterli"}
-        else if(t==="limited"){c="limited";t="Sınırlı"}
+        let c="out", t="Yok";
+        if(s.stockLevel==="sufficient"){c="sufficient";t="Yeterli"}
+        else if(s.stockLevel==="limited"){c="limited";t="Sınırlı"}
 
         h+=`<tr>
             <td>${s.distance} m</td>
             <td>${s.name}</td>
             <td>${s.address}</td>
-            <td class="${c}">${t}</td>
+            <td><span class="badge ${c}">${t}</span></td>
         </tr>`;
     });
 
-    document.getElementById("tablo").innerHTML = h + "</table>";
+    document.getElementById("tablo").innerHTML=h+"</table>";
 }
 </script>
 </body>
